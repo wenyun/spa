@@ -1,0 +1,105 @@
+// Copyright 2012-present Wen-Yun Yang. All rights reserved.
+
+#pragma once
+
+#include <cstdlib>
+#include <cstdio>
+#include <string>
+
+#define Malloc(type,n) (type *)malloc((n)*sizeof(type))
+
+// system macros
+#define MAX_DIMENSION 3
+
+// verbose level
+#define QUIET 0
+#define SHORT 1
+#define MEDIUM 2
+#define WORDY 3
+#define CRAZY 4
+
+// genetics macros
+#define MISSING_ALLELE '0'
+#define MISSING -1
+#define HOMO_MAJOR 0
+#define HOMO_MINOR 2
+#define HETER 1
+
+struct spa_parameter {
+  
+  char* bfile;
+  char* pfile;
+  char* tfile;
+  char* gfile;
+  char* ilfile;
+  char* olfile;
+  char* imfile;
+  char* omfile;
+  
+  int generation;
+  int dimension;
+  int max_iter;
+  double step_epsilon;
+
+  int max_sub_iter;
+  double epsilon;
+  double alpha;
+  double beta;
+
+  int verbose;
+
+  int large_step_since;
+};
+
+struct snp_info_struct {
+  char* chromosome;
+  char* snp_id;
+  char* morgan;
+  int position;
+  char snp_minor;
+  char snp_major;
+};
+
+struct individual_info_struct {
+  char* family_id;
+  char* individual_id;
+  char* paternal_id;
+  char* maternal_id;
+  char* sex;
+  char* phenotype;
+};
+
+struct spa_model {
+  int n_individual;
+  int n_snp;
+
+  snp_info_struct* snp_info;
+  individual_info_struct* individual_info;
+  
+  double** coef_a;
+  double* coef_b;
+  double** x;
+
+  double* coef_a_space;
+  double* x_space;
+
+  double* score;
+};
+
+struct spa_data {
+  
+  int n_individual;
+  int n_snp;
+  
+  snp_info_struct* snp_info;
+  individual_info_struct* individual_info;
+  
+  char** genotype;
+  char* genotype_space;
+};
+
+void spa_error_exit(const char* msg);
+void spa_warning(const char* msg);
+void spa_message(const char* msg, 
+                 const int level,
+                 const spa_parameter *param);

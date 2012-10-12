@@ -1,0 +1,317 @@
+\documentclass[12pt]{article}
+
+\usepackage{fullpage}
+\usepackage{url}
+
+\title{Manual for SPA Software}
+
+\author{Wen-Yun Yang, John Novembre, Eleazar Eskin and Eran Halperin}
+\date{Initial version: May 8, 2012\\ Revised version: Aug 28, 2012}
+
+
+
+\begin{document}
+
+\maketitle
+
+\section*{Introduction}
+This software is an implementation of the SPatial Ancestral analysis (SPA) method introduced in the
+following paper
+
+\begin{itemize}
+\item A model-based approach for analysis of spatial structure in genetic data. Wen-Yun Yang, John 
+Novembre, Eleazar Eskin and Eran Halperin. Nature Genetics. 2012
+\end{itemize}
+This software is also available at \url{http://genetics.cs.ucla.edu/spa}. For any suggestions and
+bug report, please send to Wen-Yun Yang (wenyun@ucla.edu)
+
+
+SPA is a command line program written in C. The program is designed for analysis of large-scale SNP data.
+All commands involve typing \verb+spa+ at the command prompt followed by a number of options
+(starting with \verb+--file-option+ or \verb+-option+).
+
+
+\section*{Running SPA}
+
+SPA is a command-line program: clicking on an icon will get you nowhere. The correct way to run SPA
+should be in a command prompt or terminal window. Then type commands as described below
+\begin{verbatim}
+spa --file-option myfile -option value
+\end{verbatim}
+
+The possible \verb+--file-option+ can be
+\begin{itemize}
+\item \verb+--bfile myfile+, which expects three files in PLINK\footnote{available
+at\url{http://pngu.mgh.harvard.edu/~purcell/plink/}} BED file format: \verb+myfile.bed+,
+\verb+myfile.bim+ and \verb+myfile.tfam+
+\item \verb+--pfile myfile+, which expects two files in PLINK PED file format: \verb+myfile.ped+ and \verb+myfile.map+ 
+\item \verb+--tfile myfile+, which expects two files in PLINK TPED file format: \verb+myfile.tped+ and \verb+myfile.tfam+
+\item \verb+--gfile myfile+, which expects one file in genotype file format: \verb+myfile+
+\item \verb+--location-input myfile+, which expects one file containing individual geographical
+locations
+\item \verb+--model-input myfile+, which expects one file containing slope function coefficients
+\item \verb+--location-output myfile+, which expects output file name for individual geographical
+locations
+\item \verb+--model-output myfile+, which expects output file name for slope function coefficients
+\end{itemize} 
+
+The possible \verb+-option+ can be
+\begin{itemize}
+\item \verb+-k dimension+ : set the number of dimensions for geographical location (default $2$)
+\item \verb+-n generation+ : set the number of generations for ancestral inference (default $1$)
+\item \verb+-e espilon+ : set tolerance of termination criterion (default $0.01$)
+\item \verb+-r tradeoff+ : set optimization epsilon tolerance (default $1e-6$). Larger value makes the
+program run faster but poor accuracy
+\item \verb+-v verbose+ : set the level of verbose (default $1$)
+\end{itemize}
+
+
+\section*{File Format}
+
+A total of five file formats are supported by SPA. We will discuss their specific format as follows.
+Three of them basically contain the same genotype information in different format: PED fileset, TPED
+fileset and genotype file. Location file is used to contain location information for each
+individual, and model file is used to contain allele frequency slope function for each SNP.
+
+
+\subsubsection*{BED fileset}
+The BED fileset used in SPA follows the same format as the original PLINK. The binary format of BED
+can significantly reduce the memory usage. The detail can be found in PLINK website.
+
+\subsubsection*{PED fileset}
+The PED fileset used in SPA follows a similar format as the original PLINK. It includes two files: PED
+file ending with .ped and MAP file ending with .map. 
+
+The PED file is a white-space (space or tab) delimited file: the first six columns are mandatory:
+\begin{verbatim}
+Family ID
+Individual ID
+Paternal ID
+Maternal ID
+Sex (1=male; 2=female; other=unknown)
+Phenotype
+\end{verbatim}
+The IDs are alphanumeric: the combination of family and individual ID should uniquely identify a
+person. Genotypes (column 7 onwards) should also be white-space delimited: they can be any character
+(e.g. 1,2,3,4 or A,C,G,T or anything else) except $0$ which is, by default, the missing genotype
+character. \textbf{All markers should be biallelic}. All SNPs must have two alleles specified.
+Either both alleles should be missing (i.e. 0) or neither. No header row should be given. 
+
+The MAP file is also a white-space (space or tab) delimited file with four columns. Each  line of
+the MAP file describes a single marker.
+\begin{verbatim}
+chromosome (1-22, X, Y or 0 if unplaced)
+rs\# or snp identifier
+Genetic distance (morgans)
+Base-pair position (bp units)
+\end{verbatim}
+
+For example, PED and MAP files for 6 individuals with 2 SNPs (one row = one person) are shown in
+Figure \ref{fig:ped_example}
+
+
+\subsubsection*{Transposed PED fileset}
+Another possible file-format is called a transposed PED fileset, containing two text files: one
+(.tped) containing SNP and genotype information where one row is a SNP; one (TFAM) containing
+individual and family information, where one row is an individual.
+
+
+The first 4 columns of a TPED file are the same as a standard 4-column MAP file. Then all genotypes
+are listed for all individuals for each particular SNP on each line. The TFAM file is just the first
+six columns of a standard PED file. In other words, we have just taken the standard PED/MAP file
+format, but swapped all the genotype information between files, after rotating it 90 degrees. For
+example, the example PED/MAP fileset can be equivalently represented as TPED/TFAM fileset at in
+Figure \ref{fig:ped_example}.
+
+
+\begin{figure}
+\begin{center}
+\begin{verbatim}
+<---- myfile.ped ---->              <--- myfile.map --->
+1 1 0 0 1  1  A A  G T              1 snp1   0   5000650
+2 1 0 0 1  1  A C  T G              1 snp2   0   5000830
+3 1 0 0 1  1  C C  G G
+4 1 0 0 1  2  A C  T T
+5 1 0 0 1  2  C C  G T
+6 1 0 0 1  2  C C  T T
+
+<------------- myfile.tped ------------->      <- myfile.tfam ->
+1 snp1 0 5000650 A A A C C C A C C C C C      1  1  0  0  1  1
+1 snp2 0 5000830 G T G T G G T T G T T T      2  1  0  0  1  1
+                                              3  1  0  0  1  1
+                                              4  1  0  0  1  2
+                                              5  1  0  0  1  2
+                                              6  1  0  0  1  2
+
+<- myfile.geno ->
+2  1
+1  1
+0  2
+1  0
+0  1
+0  0
+\end{verbatim} 
+\end{center}
+\caption{Examples for PED/MAP, TPED/TFAM and genotype file sets.}\label{fig:ped_example}
+\end{figure}
+
+\subsubsection*{Genotype file}
+
+Genotype file contains a matrix with elements only 0, 1 and 2. One row is an individual and one
+column is a SNP. The elements 0, 1 and 2 indicates the number of minor alleles for each individual
+at each SNP. The missing value can be any other integer number, usually -1 is used as missing
+genotype. For example, the equivalent genotype file is given in Figure \ref{fig:ped_example}.  
+The minor alleles for the first and second SNP are A and G, respectively.
+
+\subsubsection*{Location file}
+
+The input and output location files follow the same format: one line is an individual. The first
+two columns are 
+\begin{verbatim}
+Family ID
+Individual ID
+\end{verbatim}
+The third column and onward contain the predicted location for each individual. An example of
+location file for 2 dimension geographical locations is given in Figure \ref{fig:model_file}.
+
+In the case of admixed individuals, each individual would have two locations. The corresponding
+location file would be one more location in the same format appended afterward the first location.
+
+\subsubsection*{Model file}
+
+The input and output model files follow the same format: one line is a SNP. The first six columns are 
+\begin{verbatim}
+chromosome (1-22, X, Y or 0 if unplaced)
+rs\# or snp identifier
+Genetic distance (morgans)
+Base-pair position (bp units)
+Minor allele
+Major allele
+\end{verbatim}
+Then the seventh column and onward are slope function coefficients. The number of coefficient columns
+depend on the number of dimensions. If the expected dimension of geographical location is $K$, then
+the number of coefficient columns are $K+1$: $K$ columns for coefficient $a$, $1$ column for coefficient 
+$b$. The last column is SPA score for selection signal detection. 
+An example of model file for 2 dimension geographical locations is given in Figure
+\ref{fig:model_file}.
+
+\begin{figure}
+\begin{verbatim}
+<---- myfile.loc ----->              
+1 1  0.23424   -0.43045              
+2 1  0.92378   -0.23442              
+3 1  1.20334   0.23234
+4 1  -0.23435  -0.95965
+5 1  -0.23675  0.43485
+6 1  -1.03294  0.30438
+
+<--------------------- myfile.model ---------------------->
+1 snp1   0   5000650  C  A  0.93454 0.21351 0.02342 1.09772
+1 snp2   0   5000830  T  G  0.23432 0.34849 0.95853 0.92843
+\end{verbatim}
+\caption{Example for location and model files}\label{fig:model_file}
+\end{figure}
+
+\section*{Typical Usage}
+
+SPA is designed to perform a couple of functions in one program. Each function can be realized by
+different combination of parameters. Below we will introduce some typical usages of SPA. 
+
+
+\subsubsection*{Bootstrap}
+SPA would be able to perform bootstrap learning, where the only input is a genotype file
+(or PED/MAP or TPED/TFAM fileset). Then SPA is able to discover the spatial structure and slope
+function for allele frequency. SPA follows an alternative maximization procedure to maximize the
+log-likelihood. To perform this kind of analysis, the typical command would be
+\begin{verbatim}
+spa --gfile myfile.gen --location-output myfile.loc --model-output myfile.model
+\end{verbatim} 
+or
+\begin{verbatim}
+spa --pfile myfile --location-output myfile.loc --model-output myfile.model
+\end{verbatim} 
+or
+\begin{verbatim}
+spa --tfile myfile --location-output myfile.loc --model-output myfile.model
+\end{verbatim} 
+which correspond to genotype file, PED fileset and TPED fileset, respectively.
+Those three commands would be equivalent as long as the three files essentially contain the same
+genotype information. We would omit the last two commands for other part of this manual, but please
+keep in mind that they are basically equivalent but just in different format.
+The other two parameters
+indicate the output files to contain the analysis results. The file \verb+myfile.lob+ and
+\verb+myfile.model+ contains the geographical coordinates for individuals and slope function
+coefficients for SNPs, respectively.
+
+By default, the dimension of spatial structure analysis is two, which is typical for samples from a
+local region within a country of a continent (e.g. Europe, Brazil). For samples from all over the
+world, the dimension should be three. Thus, the below command should be used
+\begin{verbatim}
+spa -k 3 --gfile myfile.gen --location-output myfile.loc --model-output myfile.model
+\end{verbatim} 
+where \verb+-k 3+ specifies the number of dimensions in the analysis. 
+
+Note that SPA does not support analysis with more than three dimensions, since we are focused on
+spatial structure. 
+
+\subsubsection*{Known geographical locations}
+
+In some cases, the geographical locations for individuals are known beforehand. Thus, we do not need
+to let SPA to infer those locations from scratch. SPA allows the input of geographical locations.
+The corresponding command would be
+\begin{verbatim}
+spa -gfile myfile.gen --location-input known.loc --model-output myfile.model
+\end{verbatim} 
+where the output file would be \verb+myfile.model+ containing all slope function coefficients.
+It is not necessary to arrange individuals in the same order between location file and genotype
+file, and it is not necessary to have the same number of individuals between them. SPA can figure it
+out automatically. 
+
+\subsubsection*{Ancestral inference}
+
+Another important application of SPA is the ancestral location inference. Given an individual's
+genotype and all slope functions of allele frequency, SPA is able to predict the geographical origin
+for a non-admixed individual, or two geographical origins for an admixed individual. We can use
+\verb+-n generation+ to specify how many origins we expect. By default, we have \verb+-n 1+, which
+would predict one origin for an individual. An illustrative example is given below. 
+\begin{verbatim}
+spa --gfile myfile.gen --model-input known.model --location-output myfile.loc
+\end{verbatim}
+For prediction of two origins, we can use \verb+-n 2+ to specify that for SPA
+\begin{verbatim}
+spa -n 2 --gfile myfile.gen --model-input known.model --location-output myfile.loc
+\end{verbatim}
+The output file \verb+myfile.loc+ would contain one or two origins for each individual in the above
+two cases, respectively.
+
+A couple of precomputed model files are provided in our website, which can be used to infer
+individual geographical origins for any PLINK files you have. For example, we provide a file
+\verb+europe.model+ trained from POPRES data set. This model file can be used to infer locations for
+all individuals in any PLINK file you have. A typical command would be
+\begin{verbatim}
+spa --bfile myfile --model-input europe.model --location-output myfile.loc
+\end{verbatim} 
+It is not necessary to arrange the SNPs in the same order between \verb+myfile.bed+ and
+\verb+europe.model+. SPA will figure it out automatically, as long as the rs numbers are correctly
+given. 
+
+Note that we have not implemented the prediction of two origins in three dimensional space. Thus,
+the parameter setting \verb+-n 2 -k 3+ would not be accepted yet.
+
+\subsubsection*{Identifying loci with steep allele frequency gradients}
+
+As described in the file format for model file, the last column would be SPA score for each SNP. 
+The SPA score would be available whenever the parameter \verb+-model-output+ is specified. Typically,
+the score can be obtained through both bootstrap scenario
+\begin{verbatim}
+spa --gfile myfile.gen --location-output myfile.loc --model-output myfile.model
+\end{verbatim}
+and the scenario of known geographical locations
+\begin{verbatim}
+spa -gfile myfile.gen --location-input known.loc --model-output myfile.model
+\end{verbatim}
+Higher SPA scores correspond to steeper inferred allele frequency gradients.
+
+
+
+\end{document}
