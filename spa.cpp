@@ -44,6 +44,7 @@ void exit_with_help() {
   "--pfile ped_prefix : prefix of .ped and .map file\n"
   "--tfile tped_prefix : prefix of .tped and .tfam file\n"
   "--gfile genotype_file : genotype file\n"
+  "--mfile 23andme_file : 23andme genotype file\n"
   "--location-input location_file : known locations\n"
   "--model-input model_file : known slope functions\n"
   "--location-output location_file : output file for individual locations\n"
@@ -62,12 +63,12 @@ void exit_with_help() {
 void print_version_information() {
   printf(
 "@----------------------------------------------------------@\n"
-"|         SPA!        |   v1.00beta    |   27/Aug/2012     |\n"
+"|         SPA!       |      v1.10      |   15/Oct/2012     |\n"
 "|----------------------------------------------------------|\n"
 "|  (C) 2012 Wen-Yun Yang, GNU General Public License, v2   |\n"
 "|----------------------------------------------------------|\n"
 "|  For documentation, citation & bug-report instructions:  |\n"
-"|      http://http://genetics.cs.ucla.edu/spa/             |\n"
+"|             http://genetics.cs.ucla.edu/spa/             |\n"
 "@----------------------------------------------------------@\n"
 "\n"
 );
@@ -97,6 +98,7 @@ void set_default_parameter(spa_parameter *param) {
   param->pfile = NULL;
   param->tfile = NULL;
   param->gfile = NULL;
+  param->mfile = NULL;
   param->ilfile = NULL;
   param->olfile = NULL;
   param->imfile = NULL;
@@ -138,14 +140,16 @@ int main (int argc, char** argv)  {
   }
 
   // read input file
-  if(param.gfile) {
+  if (param.gfile) {
     read_gfile(param.gfile, &geno, &param);
-  } else if(param.bfile) {
+  } else if (param.bfile) {
     read_bedfile(param.bfile, &geno, &param);  
-  } else if(param.tfile) {
+  } else if (param.tfile) {
     read_tpedfile(param.tfile, &geno, &param);
-  } else if(param.pfile) {
+  } else if (param.pfile) {
     read_pedfile(param.pfile, &geno, &param);
+  } else if (param.mfile) {
+    read_mfile(param.mfile, &geno, &param);
   }
   
   sprintf(line, 
@@ -157,7 +161,7 @@ int main (int argc, char** argv)  {
 
   if (!param.imfile && !param.ilfile) {
     data_sanity_check(&geno);
-    spa_message("Bootstrap learning ...", SHORT, &param);
+    spa_message("Unsupervised learning ...", SHORT, &param);
     copy_info(&model, &geno, BOTH);
     allocate_model_for_bootstrap(&model, &param); 
     spa_optimize(&model, &geno, &param, BOTH);   
@@ -877,6 +881,8 @@ void parse_input_parameters(int argc,
           param->pfile = argv[i];
         } else if(!strcmp(argv[i-1], "--gfile")) {
           param->gfile = argv[i];
+        } else if(!strcmp(argv[i-1], "--mfile")) {
+          param->mfile = argv[i];
         } else if(!strcmp(argv[i-1], "--location-input")) {
           param->ilfile = argv[i];
         } else if(!strcmp(argv[i-1], "--model-input")) {

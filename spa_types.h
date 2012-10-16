@@ -31,6 +31,7 @@ struct spa_parameter {
   char* pfile;
   char* tfile;
   char* gfile;
+  char* mfile;
   char* ilfile;
   char* olfile;
   char* imfile;

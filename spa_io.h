@@ -21,6 +21,9 @@ void read_tpedfile(const char* filename,
 void read_gfile(const char* filename,
                 spa_data* geno,
                 const spa_parameter* param);
+void read_mfile(const char* filename,
+                spa_data* geno,
+                const spa_parameter* param);
 void read_location_ilfile(const char* filename, 
                           spa_model* model,
                           const spa_parameter* param);

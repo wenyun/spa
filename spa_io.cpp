@@ -11,8 +11,10 @@
 #define MODEL_FILE_TAILER 4 
 #define BIM 6
 #define MAP 4
+#define TTANDME 8
 #define GENOTYPE_PER_BYTE 4
 #define MISSING_ALLELE '0'
+
 
 extern char* line;
 extern int max_line_len;
@@ -64,28 +66,59 @@ void allocate_genotype(spa_data* geno) {
 
 void read_snp_info(snp_info_struct* snp_info, int mode) {
   char* fid;
+
+  if (mode == TTANDME) {
  
-  fid = strtok(line, " \t\n");
-  snp_info->chromosome = Malloc(char, strlen(fid) + 2);
-  strcpy(snp_info->chromosome, fid);
-  
-  fid = strtok(NULL, " \t\n");
-  snp_info->snp_id = Malloc(char, strlen(fid) + 1);
-  strcpy(snp_info->snp_id, fid);
-  
-  fid = strtok(NULL, " \t\n");
-  snp_info->morgan = Malloc(char, strlen(fid) + 1);
-  strcpy(snp_info->morgan, fid);
-
-  fid = strtok(NULL, " \t\n");
-  snp_info->position = atoi(fid);
-
-  if (mode == BIM) {
-    fid = strtok(NULL, " \t\n");
-    snp_info->snp_minor = fid[0];
+    fid = strtok(line, " \t\n");
+    snp_info->snp_id = Malloc(char, strlen(fid) + 1);
+    strcpy(snp_info->snp_id, fid);
 
     fid = strtok(NULL, " \t\n");
-    snp_info->snp_major = fid[0];
+    snp_info->chromosome = Malloc(char, strlen(fid) + 2);
+    strcpy(snp_info->chromosome, fid);
+    
+    fid = strtok(NULL, " \t\n");
+    snp_info->position = atoi(fid);
+
+    snp_info->morgan = Malloc(char, 2);
+    strcpy(snp_info->morgan, "0");
+
+    fid = strtok(NULL, " \t\n");
+    if (fid[0] != fid[1]) {
+      snp_info->snp_major = fid[0];
+      snp_info->snp_minor = fid[1];
+    } else if (fid[0] == '-' && fid[1] == '-') {
+      snp_info->snp_major = MISSING_ALLELE;
+      snp_info->snp_minor = MISSING_ALLELE;
+    } else {
+      snp_info->snp_major = fid[0];
+      snp_info->snp_minor = MISSING_ALLELE;
+    }
+
+  } else {
+
+    fid = strtok(line, " \t\n");
+    snp_info->chromosome = Malloc(char, strlen(fid) + 2);
+    strcpy(snp_info->chromosome, fid);
+    
+    fid = strtok(NULL, " \t\n");
+    snp_info->snp_id = Malloc(char, strlen(fid) + 1);
+    strcpy(snp_info->snp_id, fid);
+    
+    fid = strtok(NULL, " \t\n");
+    snp_info->morgan = Malloc(char, strlen(fid) + 1);
+    strcpy(snp_info->morgan, fid);
+
+    fid = strtok(NULL, " \t\n");
+    snp_info->position = atoi(fid);
+
+    if (mode == BIM) {
+      fid = strtok(NULL, " \t\n");
+      snp_info->snp_minor = fid[0];
+
+      fid = strtok(NULL, " \t\n");
+      snp_info->snp_major = fid[0];
+    }
   }
 }
 
@@ -503,32 +536,81 @@ void count_file(FILE *fp, int *rows, int *columns) {
 
   while(readline(fp) != NULL) {
     k = 0;
-    
-    tok = strtok(line, " \t");
-    ++k;
-    while(1) {
-      tok = strtok(NULL, " \t");
-      // check '\n' as ' ' may be after the last element
-      if(tok == NULL || *tok == '\n') 
-        break;
+    if (line[0] != '#') {
+      tok = strtok(line, " \t");
       ++k;
-    }
-    
-    if(k == 0){
-      spa_error_exit("empty row\n");
-    }
-    if(cl == 0) {
-      cl = k;
-    } else {
-      if(cl != k) {
-        spa_error_exit("different number of columns\n");
+      while(1) {
+        tok = strtok(NULL, " \t");
+        // check '\n' as ' ' may be after the last element
+        if(tok == NULL || *tok == '\n') 
+          break;
+        ++k;
       }
+      
+      if(k == 0){
+        spa_error_exit("empty row\n");
+      }
+      if(cl == 0) {
+        cl = k;
+      } else {
+        if(cl != k) {
+          spa_error_exit("different number of columns\n");
+        }
+      }
+      rw++;
     }
-    rw++;
   }
-
+  
   (*rows) = rw;
   (*columns) = cl;
+}
+
+void read_mfile(const char* filename,
+                spa_data* geno,
+                const spa_parameter* param) {
+  
+  int rows, columns, i;
+
+  FILE *fp;
+
+  fp = spa_open_file(filename, "r");
+  count_file(fp, &rows, &columns);
+  sprintf(line, "%s: %d row %d column", filename, rows, columns);
+  spa_message(line, MEDIUM, param);
+  
+  geno->snp_info = Malloc(snp_info_struct, rows);
+  geno->n_snp = rows;
+  
+  rewind(fp);
+  readline(fp);
+  while (line[0] == '#') {
+    readline(fp);
+  }
+  for(i = 0; i < geno->n_snp; i++) {
+    read_snp_info(geno->snp_info + i, TTANDME);
+    readline(fp);
+  }
+  
+  geno->individual_info = Malloc(individual_info_struct, 1);
+  geno->n_individual = 1;
+  strcpy(line, "1 1 0 0 0 0");
+  read_individual_info(geno->individual_info);
+  
+  allocate_genotype(geno);
+
+  for(i = 0; i < geno->n_snp; i++) {
+    if (geno->snp_info[i].snp_major == MISSING_ALLELE &&
+        geno->snp_info[i].snp_minor == MISSING_ALLELE) {
+      set_genotype(geno->genotype, 0, i, MISSING);
+    } else if (geno->snp_info[i].snp_major != MISSING_ALLELE &&
+               geno->snp_info[i].snp_minor == MISSING_ALLELE) {
+      set_genotype(geno->genotype, 0, i, HOMO_MAJOR);
+    } else if (geno->snp_info[i].snp_major != geno->snp_info[i].snp_minor) {
+      set_genotype(geno->genotype, 0, i, HETER);
+    }
+  }
+
+  spa_message("23andme file read successfully", SHORT, param);
 }
 
 
