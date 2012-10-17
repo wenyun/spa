@@ -33,6 +33,9 @@ void read_model_imfile(const char* filename,
 void write_location_olfile(const char* filename,
                            const spa_model* model,
                            const spa_parameter* param);
+void write_html_location_olfile(const char* filename,
+                                const spa_model* model,
+                                const spa_parameter* param);
 void write_model_omfile(const char* filename,
                         const spa_model* model,
                         const spa_parameter* param);

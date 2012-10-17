@@ -682,6 +682,33 @@ void write_location_olfile(const char* filename,
   fclose(fp);
 }
 
+void write_html_location_olfile(const char* filename,
+                                const spa_model* model,
+                                const spa_parameter* param) {
+
+  FILE* fp;
+
+  sprintf(line, "%s.html", filename);
+  fp = spa_open_file(line, "w");
+
+  fprintf(fp, 
+          "<HTML>\n"
+          "  <HEAD>\n"
+          "    <TITLE>You are from here</TITLE>\n"
+          "      <META http-equiv=\"REFRESH\"" 
+          "            content=\"0;url=https://maps.google.com/maps?q=%f,%f\">\n"
+          "  </HEAD>\n"
+          "  <BODY>\n"
+          "    Redirecting...\n"
+          "  </BODY>"
+          "</HTML>",
+          model->x[0][0],
+          model->x[0][1]
+          );
+
+  fclose(fp);
+}
+
 void read_model_imfile(const char* filename, 
                        spa_model *model,
                        const spa_parameter *param) {

@@ -196,6 +196,14 @@ int main (int argc, char** argv)  {
   if(param.olfile) {
     spa_message("Individual location estimated", MEDIUM, &param);
     write_location_olfile(param.olfile, &model, &param);
+
+    if (param.mfile) {
+      write_html_location_olfile(param.olfile, &model, &param);
+      sprintf(line,
+              "CHECK YOUR ANCESTRY ORIGIN BY CLICKING %s.html",
+              param.olfile);
+      spa_message(line, SHORT, &param);
+    }
   }
   if(param.omfile) {
     spa_message("Slope functions estimated", MEDIUM, &param);
