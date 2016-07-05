@@ -21,21 +21,6 @@ using std::map;
 #define MAX_MESSAGE 1024
 #define MAX_LINE_INIT 1024
 
-// dimension
-#define PLANE 2
-#define GLOBE 3
-
-// generation
-#define SELF 1
-#define PARENT 2
-
-// program mode
-#define COEF_ONLY 1
-#define LOCT_ONLY 2
-#define BOTH 3
-#define LOCT_GLOBE 4
-#define ADMIXED 5
-
 void exit_with_help() {
   printf(
   "Usage: spa [options]\n"
@@ -63,7 +48,7 @@ void exit_with_help() {
 void print_version_information() {
   printf(
 "@----------------------------------------------------------@\n"
-"|         SPA!       |      v1.10      |   15/Oct/2012     |\n"
+"|         SPA!       |      v1.13      |    4/APR/2012     |\n"
 "|----------------------------------------------------------|\n"
 "|  (C) 2012 Wen-Yun Yang, GNU General Public License, v2   |\n"
 "|----------------------------------------------------------|\n"
@@ -292,7 +277,7 @@ void spa_optimize(spa_model *model,
   } else if (mode == ADMIXED) {
     initialize_random_location(model, geno, param);
     for(i = 0; i < geno->n_individual; i++) {
-      spa_sub_optimize_admixed(model, geno, param, i);
+      spa_sub_optimize_admixed(model, geno, param, i, 3); // try 3 times
     }
   } else {
     spa_error_exit("You should not see this error message, "
@@ -325,7 +310,6 @@ void spa_sub_optimize(spa_model *model,
     // optimize a[i] b[i] 
     pt = model->coef_a[i];
     pb = model->coef_b[i];
-  
     for(iter = 0; iter < param->max_sub_iter; iter++) {  
       vector_init(a_grad, param->dimension, 0); 
       vector_init(a_hess, param->dimension*param->dimension, 0); 
@@ -376,7 +360,7 @@ void spa_sub_optimize(spa_model *model,
       lambda = (- vector_inner_product(a_grad, ad, param->dimension) 
                 - bd * b_grad) 
                / geno->n_individual;
-
+      
       if(lambda < param->epsilon)
         break;
 
@@ -701,109 +685,118 @@ double spa_sub_objective_admixed(const spa_model *model,
 void spa_sub_optimize_admixed(spa_model *model,
                               const spa_data *geno,
                               const spa_parameter *param,
-                              const int i) {
-  int j, iter;
+                              const int i,
+                              const int n_trial) {
+  int j, trial, iter;
   double grad[MAX_DIMENSION * PARENT];
 
   double xd[MAX_DIMENSION * PARENT];
   double xtmp[MAX_DIMENSION * PARENT];
+  double min_x[MAX_DIMENSION * PARENT];
   double *pt;
 
-  double f, m, lambda, t, obj, objt, bound;
+  double f, m, lambda, t, obj, objt, bound, min_obj;
   
   pt = model->x[i];
+  min_obj = INF;
+  for(trial = 0; trial < n_trial; trial++) {
+    for(iter = 0; iter < param->max_sub_iter; iter++) {  
+      vector_init(grad, param->dimension * param->generation, 0); 
 
-  for(iter = 0; iter < param->max_sub_iter; iter++) {  
-    vector_init(grad, param->dimension * param->generation, 0); 
+      // compute gradient
+      for(j = 0; j < geno->n_snp; j++) {
+        f = 1 / (1 + exp(- vector_inner_product(model->coef_a[j], 
+                                                model->x[i],
+                                                param->dimension) 
+                         - model->coef_b[j]));
 
-    // compute gradient
-    for(j = 0; j < geno->n_snp; j++) {
-      f = 1 / (1 + exp(- vector_inner_product(model->coef_a[j], 
-                                              model->x[i],
-                                              param->dimension) 
-                       - model->coef_b[j]));
-
-      m = 1 / (1 + exp(- vector_inner_product(model->coef_a[j], 
-                                              model->x[i] + param->dimension,
-                                              param->dimension) 
-                       - model->coef_b[j]));
-      
-      switch(get_genotype(geno->genotype, i, j)) {
-        case HOMO_MAJOR:
-          vector_add(grad, model->coef_a[j], f, param->dimension);
-          vector_add(grad + param->dimension, 
-                     model->coef_a[j], 
-                     m, 
-                     param->dimension);
-          break;
-        case HETER:
-          vector_add(grad, 
-                     model->coef_a[j],
-                     -(1-2*m)*(1-f)*f/(f*(1-m)+m*(1-f)),
-                     param->dimension);
-          vector_add(grad + param->dimension,
-                     model->coef_a[j],
-                     -(1-2*f)*(1-m)*m/(f*(1-m)+m*(1-f)),
-                     param->dimension);
-          break;
-        case HOMO_MINOR:
-          vector_add(grad, model->coef_a[j], -1+f, param->dimension);
-          vector_add(grad + param->dimension,
-                     model->coef_a[j],
-                     -1+m,
-                     param->dimension);
-          break;
+        m = 1 / (1 + exp(- vector_inner_product(model->coef_a[j], 
+                                                model->x[i] + param->dimension,
+                                                param->dimension) 
+                         - model->coef_b[j]));
+        
+        switch(get_genotype(geno->genotype, i, j)) {
+          case HOMO_MAJOR:
+            vector_add(grad, model->coef_a[j], f, param->dimension);
+            vector_add(grad + param->dimension, 
+                       model->coef_a[j], 
+                       m, 
+                       param->dimension);
+            break;
+          case HETER:
+            vector_add(grad, 
+                       model->coef_a[j],
+                       -(1-2*m)*(1-f)*f/(f*(1-m)+m*(1-f)),
+                       param->dimension);
+            vector_add(grad + param->dimension,
+                       model->coef_a[j],
+                       -(1-2*f)*(1-m)*m/(f*(1-m)+m*(1-f)),
+                       param->dimension);
+            break;
+          case HOMO_MINOR:
+            vector_add(grad, model->coef_a[j], -1+f, param->dimension);
+            vector_add(grad + param->dimension,
+                       model->coef_a[j],
+                       -1+m,
+                       param->dimension);
+            break;
+        }
       }
-    }
 
-    // test termination
-    vector_copy(xd, grad, param->dimension * param->generation);
-    vector_scale(xd, -1, param->dimension * param->generation);
+      // test termination
+      vector_copy(xd, grad, param->dimension * param->generation);
+      vector_scale(xd, -1, param->dimension * param->generation);
 
-    lambda = 
-      sqrt(-vector_inner_product(grad, 
-                                 xd, 
-                                 param->dimension * param->generation));
-    
-    if(lambda < param->epsilon)
-      break;
+      lambda = 
+        sqrt(-vector_inner_product(grad, 
+                                   xd, 
+                                   param->dimension * param->generation));
+      
+      if(lambda < param->epsilon)
+        break;
 
-    // line search
-    obj = spa_sub_objective_admixed(model, geno, param, i);
-    model->x[i] = xtmp;
-    
-    t = 1;
-    vector_add_to_new(xtmp, pt, xd, t, param->dimension * param->generation);
-    
-    objt = spa_sub_objective_admixed(model, geno, param, i);
-    bound = obj + param->alpha * 
-                  t * 
-                  vector_inner_product(grad, 
-                                       xd,
-                                       param->dimension * param->generation);
-    
-    while(objt > bound) {
-      t = t * param->beta;
+      // line search
+      obj = spa_sub_objective_admixed(model, geno, param, i);
+      model->x[i] = xtmp;
+      
+      t = 1;
       vector_add_to_new(xtmp, pt, xd, t, param->dimension * param->generation);
-
+      
       objt = spa_sub_objective_admixed(model, geno, param, i);
       bound = obj + param->alpha * 
                     t * 
-                    vector_inner_product(grad,
+                    vector_inner_product(grad, 
                                          xd,
                                          param->dimension * param->generation);
-    }
-    vector_copy(pt, xtmp, param->dimension * param->generation);
-    model->x[i] = pt;
-    
-    sprintf(line,
-            "Iter %d: objective = %.10f, gradient norm = %.10f",
-            iter,
-            obj,
-            lambda);
+      
+      while(objt > bound) {
+        t = t * param->beta;
+        vector_add_to_new(xtmp, pt, xd, t, param->dimension * param->generation);
 
-    spa_message(line, WORDY, param);
+        objt = spa_sub_objective_admixed(model, geno, param, i);
+        bound = obj + param->alpha * 
+                      t * 
+                      vector_inner_product(grad,
+                                           xd,
+                                           param->dimension * param->generation);
+      }
+      vector_copy(pt, xtmp, param->dimension * param->generation);
+      model->x[i] = pt;
+      
+      sprintf(line,
+              "Iter %d: objective = %.10f, gradient norm = %.10f",
+              iter,
+              obj,
+              lambda);
+
+      spa_message(line, WORDY, param);
+    }
+    if (obj < min_obj) {
+      min_obj = obj;
+      vector_copy(min_x, model->x[i], param->dimension * param->generation);
+    }
   }
+  vector_copy(model->x[i], min_x, param->dimension * param->generation);
 }
 
 void lusolv(double *a, int n, double *b, const spa_parameter *param)
@@ -1417,6 +1410,9 @@ void allocate_model_x(spa_model *model,
                                    param->generation *
                                    param->dimension]);
   }
+  vector_init(model->x_space, model->n_individual *
+                              param->generation *
+                              param->dimension, 0); 
 }
 
 void allocate_model_coef(spa_model *model,
@@ -1429,6 +1425,9 @@ void allocate_model_coef(spa_model *model,
   }
   model->coef_b = Malloc(double, model->n_snp);
   model->score = Malloc(double, model->n_snp);
+  vector_init(model->coef_a_space, model->n_snp * param->dimension, 0);  
+  vector_init(model->coef_b, model->n_snp, 0);
+  
 }
 
 void allocate_model_for_bootstrap(spa_model *model,

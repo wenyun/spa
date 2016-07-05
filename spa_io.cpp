@@ -1,6 +1,7 @@
 // Copyright 2012-present Wen-Yun Yang. All rights reserved.
 
 #include "spa_io.h"
+#include "spa_types.h"
 
 #include <cmath>
 #include <cstring>
@@ -10,6 +11,7 @@
 #define MODEL_FILE_HEADER 4
 #define MODEL_FILE_TAILER 4 
 #define BIM 6
+#define SPA_MODEL 66
 #define MAP 4
 #define TTANDME 8
 #define GENOTYPE_PER_BYTE 4
@@ -114,10 +116,18 @@ void read_snp_info(snp_info_struct* snp_info, int mode) {
 
     if (mode == BIM) {
       fid = strtok(NULL, " \t\n");
+      snp_info->snp_major = fid[0];
+
+      fid = strtok(NULL, " \t\n");
+      snp_info->snp_minor = fid[0];
+
+    } else if (mode == SPA_MODEL) {
+      fid = strtok(NULL, " \t\n");
       snp_info->snp_minor = fid[0];
 
       fid = strtok(NULL, " \t\n");
       snp_info->snp_major = fid[0];
+
     }
   }
 }
@@ -271,16 +281,16 @@ void snp_flip(spa_data* geno) {
     if(m > k) {
       // swap minor and major allele
       for(i = 0; i < geno->n_individual; i++) {
-        if(get_genotype(geno->genotype, i, j) == 0) {
-          set_genotype(geno->genotype, i, j, 2);
-        } else if(get_genotype(geno->genotype, i, j) == 2) {
-          set_genotype(geno->genotype, i, j, 0);
+        if(get_genotype(geno->genotype, i, j) == HOMO_MAJOR) {
+          set_genotype(geno->genotype, i, j, HOMO_MINOR);
+        } else if(get_genotype(geno->genotype, i, j) == HOMO_MINOR) {
+          set_genotype(geno->genotype, i, j, HOMO_MAJOR);
         }
       }
 
-      sp = geno->snp_info[i].snp_major;
-      geno->snp_info[i].snp_major = geno->snp_info[i].snp_minor;
-      geno->snp_info[i].snp_minor = sp;
+      sp = geno->snp_info[j].snp_major;
+      geno->snp_info[j].snp_major = geno->snp_info[j].snp_minor;
+      geno->snp_info[j].snp_minor = sp;
     }
   }
 }
@@ -459,7 +469,7 @@ void arrange_genotype_in_number(char* buf, spa_data* geno, int i) {
  
   for(j = 0; j < geno->n_individual; j++) {
     if (buf[2*j] == MISSING_ALLELE || buf[2*j+1] == MISSING_ALLELE) {
-      set_genotype(geno->genotype, j, i, -1);
+      set_genotype(geno->genotype, j, i, MISSING);
     } else if(buf[2*j] != buf[2*j+1]) {
       set_genotype(geno->genotype, j, i, HETER);
     } else if(buf[2*j] == geno->snp_info[i].snp_major) {
@@ -497,8 +507,8 @@ void read_gfile(const char* filename,
   }
 
   for(i = 0; i < geno->n_snp; i++) {
-    sprintf(line, "%d SNP%d %d %d %d %d", 0, i+1, 0, 0, 0, 1);
-    read_snp_info(geno->snp_info + i, BIM);
+    sprintf(line, "%d SNP%d %d %d %d %d", 0, i+1, 0, 0, 1, 2);
+    read_snp_info(geno->snp_info + i, SPA_MODEL);
   }
 
   for(i = 0; i < geno->n_individual; i++) {
@@ -687,24 +697,84 @@ void write_html_location_olfile(const char* filename,
                                 const spa_parameter* param) {
 
   FILE* fp;
+  double lat_center;
+  double lng_center;
 
   sprintf(line, "%s.html", filename);
   fp = spa_open_file(line, "w");
 
-  fprintf(fp, 
-          "<HTML>\n"
-          "  <HEAD>\n"
-          "    <TITLE>You are from here</TITLE>\n"
-          "      <META http-equiv=\"REFRESH\"" 
-          "            content=\"0;url=https://maps.google.com/maps?q=%f,%f\">\n"
-          "  </HEAD>\n"
-          "  <BODY>\n"
-          "    Redirecting...\n"
-          "  </BODY>"
-          "</HTML>",
-          model->x[0][0],
-          model->x[0][1]
-          );
+  if (param->generation == SELF) {
+    
+    sprintf(line, 
+"var pos = new google.maps.LatLng(%f, %f);\n"
+"var infowindow = new google.maps.InfoWindow({\n"
+"      map: map,\n"
+"      position: pos,\n"
+"      content: 'Your ancestry is from here'\n"
+"    });",
+    model->x[0][0],
+    model->x[0][1]
+    );
+    lat_center = model->x[0][0];
+    lng_center = model->x[0][1];
+  } else if (param->generation == PARENT) {
+    
+    sprintf(line, 
+"var ppos = new google.maps.LatLng(%f, %f);\n"
+"var mpos = new google.maps.LatLng(%f, %f);\n"
+"var infowindow = new google.maps.InfoWindow({\n"
+"      map: map,\n"
+"      position: ppos,\n"
+"      content: 'Your first ancestry is from here'\n"
+"    });\n"
+"var infowindow = new google.maps.InfoWindow({\n"
+"      map: map,\n"
+"      position: mpos,\n"
+"      content: 'Your second ancestry is from here'\n"
+"    });",
+    model->x[0][0],
+    model->x[0][1],
+    model->x[0][2],
+    model->x[0][3]
+    );
+    lat_center = model->x[0][0] / 2 + model->x[0][2] / 2;
+    lng_center = model->x[0][1] / 2 + model->x[0][3] / 2;
+  }
+  
+  fprintf(fp,
+"<!DOCTYPE html>\n"
+"  <html>\n"
+"    <head>\n"
+"      <meta name=\"viewport\" content=\"initial-scale=1.0, user-scalable=no\" />\n"
+"      <style type=\"text/css\">\n"
+"        html { height: 100%% }\n"
+"        body { height: 100%%; margin: 0; padding: 0 }\n"
+"      </style>\n"
+"      <script type=\"text/javascript\"\n"
+"        src=\"http://maps.googleapis.com/maps/api/js?sensor=false&"
+"key=AIzaSyDmlI1dvRWM1Ohy_NIvb7on_DbpErFwfN8\">\n"
+"      </script>\n"
+"      <script type=\"text/javascript\">\n"
+"        function initialize() {\n"
+"          var mapOptions = {\n"
+"            center: new google.maps.LatLng(%f, %f),\n"
+"            zoom: 3,\n"
+"            mapTypeId: google.maps.MapTypeId.ROADMAP\n"
+"          };\n"
+"          var map = new google.maps.Map(document.getElementById(\"map_canvas\"),\n"
+"              mapOptions);\n"
+"%s\n"
+"        }\n"
+"      </script>\n"
+"    </head>\n"
+"    <body onload=\"initialize()\">\n"
+"      <div id=\"map_canvas\" style=\"width:100%%; height:100%%\"></div>\n"
+"    </body>\n"
+"  </html>",
+  lat_center,
+  lng_center,
+  line
+  );
 
   fclose(fp);
 }
@@ -737,7 +807,7 @@ void read_model_imfile(const char* filename,
   if(columns - param->dimension == MODEL_FILE_HEADER + MODEL_FILE_TAILER) {
     for(i = 0; i < model->n_snp; i++) {
       readline(fp);
-      read_snp_info(model->snp_info + i, BIM);
+      read_snp_info(model->snp_info + i, SPA_MODEL);
 
       for(j = 0; j < param->dimension; j++) {  
         model->coef_a[i][j] = atof(strtok(NULL, " \t\n"));

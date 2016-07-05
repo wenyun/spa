@@ -61,7 +61,8 @@ double spa_sub_objective_admixed(const spa_model* model,
 void spa_sub_optimize_admixed(spa_model* model,
                               const spa_data* geno,
                               const spa_parameter* param,
-                              const int index);
+                              const int index,
+                              const int n_trial);
 
 // numerical functions
 void lusolv(double* a, int n, double* b, const spa_parameter* param);

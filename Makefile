@@ -22,3 +22,4 @@ spa_run: spa.o spa_util.o spa_io.o
 
 clean:
 	rm -f *.o
+	rm spa
