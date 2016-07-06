@@ -45,7 +45,7 @@ int ludcmp(double *a, int n, int *indx, int *d) {
       for (k = 0; k < j; k++)
         sum -= a[i * n + k] * a[k * n + j];
       a[i * n + j] = sum;
-      if ( (dum=vv[i] * abs(sum)) >= big) {
+      if ( (dum=vv[i] * std::abs(sum)) >= big) {
         big = dum;
         imax = i;
       }

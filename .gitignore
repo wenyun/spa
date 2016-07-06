@@ -1,0 +1,9 @@
+/**/target/
+/**/*.o
+/**/*.pyc
+/**/.cproject
+/**/.DS_Store
+/**/.idea
+/**/.project
+/**/.pydevproject
+

@@ -697,8 +697,8 @@ void write_html_location_olfile(const char* filename,
                                 const spa_parameter* param) {
 
   FILE* fp;
-  double lat_center;
-  double lng_center;
+  double lat_center = 0;
+  double lng_center = 0;
 
   sprintf(line, "%s.html", filename);
   fp = spa_open_file(line, "w");
