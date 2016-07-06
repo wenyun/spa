@@ -42,15 +42,15 @@
 
 struct spa_parameter {
   
-  char* bfile;
-  char* pfile;
-  char* tfile;
-  char* gfile;
-  char* mfile;
-  char* ilfile;
-  char* olfile;
-  char* imfile;
-  char* omfile;
+  const char* bfile;
+  const char* pfile;
+  const char* tfile;
+  const char* gfile;
+  const char* mfile;
+  const char* ilfile;
+  const char* olfile;
+  const char* imfile;
+  const char* omfile;
   
   int generation;
   int dimension;

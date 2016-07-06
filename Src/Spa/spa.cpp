@@ -16,8 +16,6 @@ using std::map;
 
 // system macro
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
-#define MAX_DIMENSION 3
-#define MAX_GENERATION 2
 #define MAX_MESSAGE 1024
 #define MAX_LINE_INIT 1024
 
@@ -26,30 +24,6 @@ char* line = NULL;
 int max_line_len = 1024;
 static int* indx;  // less than 10 dimensions Newton's method
 static char* error_buffer;
-
-void exit_with_help() {
-  printf(
-  "Usage: spa [options]\n"
-  "options: \n"
-  "--bfild bed_prefix : prefix of .bed, .bim and .fam file\n"
-  "--pfile ped_prefix : prefix of .ped and .map file\n"
-  "--tfile tped_prefix : prefix of .tped and .tfam file\n"
-  "--gfile genotype_file : genotype file\n"
-  "--mfile 23andme_file : 23andme genotype file\n"
-  "--location-input location_file : known locations\n"
-  "--model-input model_file : known slope functions\n"
-  "--location-output location_file : output file for individual locations\n"
-  "--model-output model_file: output file for slope function coefficients" 
-    "and SPA score\n"
-  "-n generation: number of locations\n"
-  "-k dimesion : dimensions of spatial analysis\n"
-  "-e epsilon : set tolerance of termination criterion (default 0.01)\n"
-  "-r tradeoff : set optimization epsilon tolerance (default 1e-6)."
-    "Larger value makes the program run faster but poor accuracy\n"
-  "-v verbose : verbose level\n"
-  );
-  exit(1);
-}
 
 void initialize() {
   indx = Malloc(int, MAX_DIMENSION);
@@ -62,31 +36,6 @@ void finalize() {
   free(indx);
   free(error_buffer);
   free(line);
-}
-
-void set_default_parameter(spa_parameter *param) {
-  param->bfile = NULL;
-  param->pfile = NULL;
-  param->tfile = NULL;
-  param->gfile = NULL;
-  param->mfile = NULL;
-  param->ilfile = NULL;
-  param->olfile = NULL;
-  param->imfile = NULL;
-  param->omfile = NULL;
-
-  // default parameters
-  param->generation = 1;
-  param->dimension = 2;
-  param->max_iter = 1000;
-  param->step_epsilon = 0.01;
-  param->max_sub_iter = 100;
-  param->alpha = 0.01;
-  param->beta = 0.5;
-  param->epsilon = 1e-6;
-  param->verbose = SHORT;
-
-  param->large_step_since = 15;
 }
 
 void spa_optimize(spa_model *model,
@@ -743,121 +692,6 @@ void initialize_random_location(spa_model *model,
       }
     }
   }
-}
-
-void parse_input_parameters(int argc,
-                            char** argv,
-                            spa_parameter *param) {
-  int i;
-
-  for(i = 1; i < argc; i++) {
-    if(argv[i][0] != '-') {
-      exit_with_help();
-    }
-    if(++i >= argc) {
-      exit_with_help();
-    }
-
-    switch(argv[i-1][1]) {
-      case '-':
-        if(!strcmp(argv[i-1], "--bfile")) {
-          param->bfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--tfile")) {
-          param->tfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--pfile")) {
-          param->pfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--gfile")) {
-          param->gfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--mfile")) {
-          param->mfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--location-input")) {
-          param->ilfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--model-input")) {
-          param->imfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--location-output")) {
-          param->olfile = argv[i];
-        } else if(!strcmp(argv[i-1], "--model-output")) {
-          param->omfile = argv[i];
-        } else {
-          sprintf(line, "Unknown options: %s\n", argv[i-1]);
-          spa_warning(line);
-          exit_with_help();
-        }
-        break;
-      case 'n':
-        param->generation = atoi(argv[i]);
-        break;
-      case 'k':
-        param->dimension = atoi(argv[i]);
-        break;
-      case 'e':
-        param->step_epsilon = atof(argv[i]);
-        break;
-      case 'v':
-        param->verbose = atoi(argv[i]);
-        break;
-      case 'r':
-        param->epsilon = atof(argv[i]);
-        break;
-      default:
-        sprintf(line, "Unknown options: -%s\n", argv[i-1]);
-        spa_warning(line);
-        exit_with_help();
-      
-    }
-  }
-}
-
-int parameter_sanity_check(const spa_parameter *param) {
-  bool flag = true;
-
-  if ((param->gfile != NULL) +
-      (param->pfile != NULL) + 
-      (param->tfile != NULL) + 
-      (param->bfile != NULL) > 1) {
-    spa_warning("More than one genotype/plink files, "
-                "make sure they are consistent\n");
-  }
-  if(param->ilfile && param->imfile) {
-    spa_warning("Both location and slope function are given, "
-                "nothing to learn...\n");
-    flag = false;
-  }
-  if(param->ilfile && param->olfile) {
-    spa_warning("Location file is given, "
-                "the output location file would be the same...\n");
-    flag = false;
-  }
-  if(param->imfile && param->omfile) {
-    spa_warning("Model file is given, "
-                "the output model file would be the same...\n");
-    flag = false;
-  }
-  if(param->generation > MAX_GENERATION) {
-    spa_warning("Ancestral inference for more than 2 ancestral locations: "
-                "not implemented yet\n");
-    flag = false;
-  }
-  if(param->dimension > MAX_DIMENSION) {
-    spa_warning("Dimension larger than 3 is not feasible"
-                "geographical coordinates\n");
-    flag = false;
-  }
-  // TODO: remove once method gets extended
-  if(param->generation == PARENT && param->dimension == GLOBE) {
-    spa_warning("Ancestral inference for admixed individual "
-                "in three dimension: not implemented yet\n");
-    flag = false;
-  }
-  if(!param->olfile && !param->omfile) {
-    spa_warning("Please specify the output files...\n");
-    flag = false;
-  }
-  if(param->epsilon > 1e-1) {
-    spa_warning("The optimization tolerance parameter might be too large\n");
-  }
-
-  return flag;
 }
 
 void data_sanity_check(const spa_data *geno) {
