@@ -17,7 +17,6 @@
 #define GENOTYPE_PER_BYTE 4
 #define MISSING_ALLELE '0'
 
-
 extern char* line;
 extern int max_line_len;
 

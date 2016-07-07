@@ -8,9 +8,6 @@
 #include <map>
 #include <string>
 
-extern char* line;
-extern int max_line_len;
-
 void exit_with_help();
 
 // initialization functions

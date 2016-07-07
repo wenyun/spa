@@ -4,6 +4,7 @@
 
 #include "spa_io.h"
 #include "spa_util.h"
+#include "spa_queue.h"
 
 #include <cmath>
 #include <cstdio>
@@ -51,8 +52,14 @@ void spa_optimize(spa_model *model,
     old_x = Malloc(double, geno->n_individual * param->dimension);
   
     for(iter = 0; iter < param->max_iter; iter++) {
-      for(i = 0; i < geno->n_snp; i++) {
-        spa_sub_optimize(model, geno, param, i, COEF_ONLY);
+      {
+        WorkQueue queue(WorkQueue::numCores());
+        
+        queue.dispatch(geno->n_snp, [model, geno, param](size_t begin, size_t end){
+          for(size_t j = begin; j < end; ++j) {
+            spa_sub_optimize(model, geno, param, j, COEF_ONLY);
+          }
+        });
       }
       
       vector_copy(old_x, model->x_space, geno->n_individual *
@@ -62,17 +69,23 @@ void spa_optimize(spa_model *model,
                                   old_x, 
                                   geno->n_individual * param->dimension));
   
-      for(i = 0; i < geno->n_individual; i++) {
-        switch(param->dimension) {
-          case PLANE:
-            spa_sub_optimize(model, geno, param, i, LOCT_ONLY);
-            break;
-          case GLOBE:
-            spa_sub_optimize(model, geno, param, i, LOCT_GLOBE);
-            break;
-        }
+      {
+        WorkQueue queue(WorkQueue::numCores());
+        
+        queue.dispatch(geno->n_individual, [model, geno, param](size_t begin, size_t end){
+          for(size_t j = begin; j < end; ++j) {
+            switch(param->dimension) {
+              case PLANE:
+                spa_sub_optimize(model, geno, param, j, LOCT_ONLY);
+                break;
+              case GLOBE:
+                spa_sub_optimize(model, geno, param, j, LOCT_GLOBE);
+                break;
+            }
+          }
+        });
       }
-    
+      
       vector_add(old_x, model->x_space, -1, geno->n_individual *
                                             param->dimension);
       step = sqrt(vector_inner_product(old_x, old_x, geno->n_individual *
@@ -94,25 +107,43 @@ void spa_optimize(spa_model *model,
   
     free(old_x);
   } else if (mode == COEF_ONLY)  {
-    for(i = 0; i < geno->n_snp; i++) {
-      spa_sub_optimize(model, geno, param, i, COEF_ONLY);
+    {
+      WorkQueue queue(WorkQueue::numCores());
+      
+      queue.dispatch(geno->n_snp, [model, geno, param](size_t begin, size_t end){
+        for(size_t j = begin; j < end; ++j) {
+          spa_sub_optimize(model, geno, param, j, COEF_ONLY);
+        }
+      });
     }
   } else if (mode == LOCT_ONLY) {
-    initialize_random_location(model, geno, param);    
-    for(i = 0; i < geno->n_individual; i++) {
-      switch(param->dimension) {
-        case PLANE:
-          spa_sub_optimize(model, geno, param, i, LOCT_ONLY);
-          break;
-        case GLOBE:
-          spa_sub_optimize(model, geno, param, i, LOCT_GLOBE);
-          break;
-      }
-    }
+    initialize_random_location(model, geno, param);
+    {
+      WorkQueue queue(WorkQueue::numCores());
+      
+      queue.dispatch(geno->n_individual, [model, geno, param](size_t begin, size_t end){
+        for(size_t j = begin; j < end; ++j) {
+          switch(param->dimension) {
+            case PLANE:
+              spa_sub_optimize(model, geno, param, j, LOCT_ONLY);
+              break;
+            case GLOBE:
+              spa_sub_optimize(model, geno, param, j, LOCT_GLOBE);
+              break;
+          }
+        }
+      });
+    }    
   } else if (mode == ADMIXED) {
     initialize_random_location(model, geno, param);
-    for(i = 0; i < geno->n_individual; i++) {
-      spa_sub_optimize_admixed(model, geno, param, i, 3); // try 3 times
+    {
+      WorkQueue queue(WorkQueue::numCores());
+      
+      queue.dispatch(geno->n_individual, [model, geno, param](size_t begin, size_t end){
+        for(size_t j = begin; j < end; ++j) {
+          spa_sub_optimize_admixed(model, geno, param, j, 3); // try 3 times
+        }
+      });
     }
   } else {
     spa_error_exit("You should not see this error message, "

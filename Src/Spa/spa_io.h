@@ -3,7 +3,6 @@
 #pragma once
 
 #include "spa_types.h"
-
 #include <cstdio>
 
 // IO functions

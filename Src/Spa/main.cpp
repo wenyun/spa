@@ -124,7 +124,8 @@ int main (int argc, char** argv)  {
   spa_data geno;
 
   print_version_information();
-
+  
+  po::variables_map vm;
   try {
     
     po::options_description desc("Spatial Ancestry Analysis");
@@ -146,7 +147,6 @@ int main (int argc, char** argv)  {
     (kVerbose, po::value<int>()->default_value(SHORT), "verbose level")
     ;
     
-    po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
     
@@ -165,7 +165,7 @@ int main (int argc, char** argv)  {
     std::cerr << "Error: " << exception.what() << std::endl;
   }
   
-
+  initialize();
   // read input file
   if (param.gfile) {
     read_gfile(param.gfile, &geno, &param);
